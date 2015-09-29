@@ -1,0 +1,32 @@
+{{ range $server, $containers := groupBy $ "Env.VIRTUAL_HOST" }}
+
+upstream {{ $server }} {
+	
+	ip_hash;
+
+  {{ range $index, $container := $containers }}{{ with $address := index $container.Addresses 0 }}server {{ $address.IP }}:{{ $address.Port }};{{ end }}{{ end }}
+}
+
+
+server {
+  listen 80;
+  server_name _;
+  rewrite ^ https://$host$request_uri? permanent;
+}
+
+server {
+  
+  server_name {{ $server }};
+
+  location /static/  {
+        alias /data/static/;
+	    }
+	
+  location / {
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_pass http://{{ $server }};
+  }
+}
+{{ end }}
